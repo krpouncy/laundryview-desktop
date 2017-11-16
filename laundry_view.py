@@ -2,10 +2,6 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 import os
 
-# clear the screen
-import os
-os.system('cls' if os.name == 'nt' else 'clear')
-
 laundry_url = "http://m.laundryview.com"
 
 tags = ["est. time remaining n min","extended cycle running for n mins",\
