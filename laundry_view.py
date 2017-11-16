@@ -1,5 +1,11 @@
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+import os
+
+# clear the screen
+import os
+os.system('cls' if os.name == 'nt' else 'clear')
+
 laundry_url = "http://m.laundryview.com"
 
 tags = ["est. time remaining n min","extended cycle running for n mins",\
@@ -63,6 +69,37 @@ def collect_room(room_url):
 
     return room
 
+def collect_heatmap(room_url):
+    """ returns a dictionary of the heatmap of use """
+    heatmap = {}
+    heatmap_soup = heat_soup("http://admin.laundryview.com/usage/"+room_url.split("php")[1])
+
+    # for table in heatmap_soup.findAll('table'):
+    #     print(len(table.findAll('tr')))
+    heatmap_table = [i.contents for i in heatmap_soup.findAll('table')[2].findAll('tr')]
+
+    for num in range(0, len(heatmap_table), 6):
+        hm = heatmap_table[num]
+        day = hm[1].string
+
+        hours = []
+        for i in range(5,17,4):
+            hour_block = [usage['class'] for usage in hm[i].contents[1].find_all('td')]
+            for hour in hour_block:
+                #convert the tags to a measureable scale before appending
+                if 'bgcream' in hour:
+                    hour = 0
+                elif 'bgyellow' in hour:
+                    hour = 1
+                elif 'bgred' in hour:
+                    hour = 2
+                else:
+                    hour = None
+                hours.append(hour)
+        heatmap[day] = hours
+
+    return heatmap
+
 if __name__ == "__main__":
     campus = collect_campus()
     buildings = {}
@@ -79,6 +116,7 @@ if __name__ == "__main__":
     for url, name in buildings.items():
         print(name)
         room = collect_room(url)
+        print('usage: 6am -> 5am', collect_heatmap(url), "\n")
         break
 
     print(room['dryer'])
