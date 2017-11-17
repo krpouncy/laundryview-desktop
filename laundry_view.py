@@ -4,8 +4,8 @@ import os
 
 laundry_url = "http://m.laundryview.com"
 
-tags = ["est. time remaining n min","extended cycle running for n mins",\
-        "cycle ended n minutes ago","out of service","unknown",\
+tags = ["est. time remaining","extended cycle running for",\
+        "cycle ended","out of service","unknown",\
         "cycle has ended - door still closed","available"]
 
 def heat_soup(url):
