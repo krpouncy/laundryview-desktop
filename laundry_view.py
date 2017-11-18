@@ -67,11 +67,9 @@ def collect_room(room_url):
 
 def collect_heatmap(room_url):
     """ returns a dictionary of the heatmap of use """
-    heatmap = {}
+    heatmap = []
     heatmap_soup = heat_soup("http://admin.laundryview.com/usage/"+room_url.split("php")[1])
 
-    # for table in heatmap_soup.findAll('table'):
-    #     print(len(table.findAll('tr')))
     heatmap_table = [i.contents for i in heatmap_soup.findAll('table')[2].findAll('tr')]
 
     for num in range(0, len(heatmap_table), 6):
@@ -79,7 +77,7 @@ def collect_heatmap(room_url):
         day = hm[1].string
 
         hours = []
-        for i in range(5,17,4):
+        for i in range(5,21,4):
             hour_block = [usage['class'] for usage in hm[i].contents[1].find_all('td')]
             for hour in hour_block:
                 #convert the tags to a measureable scale before appending
@@ -92,8 +90,7 @@ def collect_heatmap(room_url):
                 else:
                     hour = None
                 hours.append(hour)
-        heatmap[day] = hours
-
+        heatmap.append((day,hours))
     return heatmap
 
 if __name__ == "__main__":
