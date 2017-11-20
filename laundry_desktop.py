@@ -4,15 +4,17 @@ import tkinter as tk
 from tkinter import ttk
 
 class LaundryForm(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, action_taken):
         ttk.Frame.__init__(self, parent.topFrame)
         self.parent = parent
 
         # some variables needed for the methods
         self.buildings = {}
         self.names = {}
-        self.rooms = {}
-
+        self.url = ""
+        self.rooms = tk.StringVar()
+        self.rooms.trace('w', lambda *args: action_taken())
+        self.stats = {}
         self.campus_label = ttk.Label(self,text="Campus", font="Calibri 11", padding='5 0 2 0')
         self.campus_label.grid(row=0,column=0,sticky='n')
 
@@ -52,14 +54,10 @@ class LaundryForm(ttk.Frame):
         """ this will collect the laundry rooms"""
         for url, name in self.buildings.items():
             if self.combo_room.get() == name:
-                self.rooms = lv.collect_room(url)
-                # create the grid
-                hs = self.parent.hostspot_module
-                if hs:
-                    hs.frm.grid_forget()
-                    hs.destroy()
-                hs = HotSpot(self.parent.bottomFrame,url)
-                hs.pack(expand=True)
+                self.url = url
+                self.stats = lv.collect_room(url)
+                self.rooms.set(self.stats)
+
 
 class HotSpot(ttk.Frame):
     def __init__(self, parent, url=""):
@@ -67,20 +65,15 @@ class HotSpot(ttk.Frame):
 
         self['style'] = 'My.TFrame'
         self['padding'] = '2 2 10 10'
-        self['relief'] = 'groove'
+        self['relief'] = 'ridge'
 
         self.url = url
 
         # check to see if a url is entered and valid
+        heatmap_list = []
         if url != "":
-            try:
-                heatmap_list = lv.collect_heatmap(url)
-                if len(heatmap_list) != 7:
-                    pass
-            except:
-                pass
-        else:
-            pass
+            heatmap_list = lv.collect_heatmap(url)
+
 
         days = ["Sun","Mon","Tues","Wed","Thu","Fri","Sat"]
         for i, day in zip(range(len(days)),days):
@@ -94,10 +87,17 @@ class HotSpot(ttk.Frame):
         heat_grid = ttk.Frame(self)
         heat_grid.grid(row=1,column=1,columnspan=24,rowspan=7, sticky="nsew")
 
+        for i in range(1,25):
+            self.grid_columnconfigure(i, weight=1)
+        for i in range(1,7):
+            self.grid_rowconfigure(i,weight=1)
+
+        heat_grid['style'] = 'My.TFrame'
+
         row = 0
         for _, hours in heatmap_list:
             column = 0
-            size = 32
+            size = 25
             # create the canvas for the each day
             day_canvas = tk.Canvas(heat_grid,width=24*size,height=size,highlightthickness=0,bd=0)
             # day_canvas.grid(column = 1, row = row, sticky="nsew")
@@ -114,13 +114,86 @@ class HotSpot(ttk.Frame):
                 column += 1
             row += 1
 
+class MachineRoom(ttk.Frame):
+    def __init__(self, parent, rooms):
+        ttk.Frame.__init__(self, parent)
+        self.parent = parent
+        # self.configure(height=200, width= 550)
+        # self.grid_propagate(0)
+        s = ttk.Style()
+        # s.configure('MachineRoom.TFrame', background='red')
+        self['style'] = 'My.TFrame'
+        self['padding'] = "5"
+        # self['relief'] = 'groove'
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=1)
+        # self.grid_columnconfigure(0, weight=1)
+        # self.grid_columnconfigure(1, weight=1)
+
+        if not rooms:
+            return
+
+        dryer_num, washer_num, dryers, washers = [], [], [], []
+        dryers = rooms['dryer']
+        washers = rooms['washer']
+        try:
+            dryer_num = [int(dryers[0][0]),int(dryers[0][2])]
+            washer_num = [int(washers[0][0]),int(washers[0][2])]
+        except:
+            pass
+
+        for stat in dryers[1]:
+            print(stat)
+
+        # create the labels for the different sections
+        ttk.Label(self,text="Dryers", font="Calibri 9",background="#333745", \
+        foreground="white").grid(column=0,row=0, sticky='w')
+        ttk.Label(self,text="Washers", font="Calibri 9",background="#333745", \
+        foreground="white").grid(column=0,row=2, sticky='w')
+
+        for i in range(dryer_num[1]):
+            Machine(self, dryers[1][i]).grid(column=i, row=1, padx=5,pady=5)
+        for i in range(washer_num[1]):
+            Machine(self, washers[1][i]).grid(column=i, row=3,padx=5,pady=5)
+        print(dryer_num, washer_num)
+
+class Machine(ttk.Frame):
+    def __init__(self, parent,stat):
+        ttk.Frame.__init__(self, parent)
+        s = ttk.Style()
+        self['relief'] = 'groove'
+        self.bind("<Enter>", lambda e: print(stat))
+        s.configure('Running.TFrame',background="#FF5959")
+        s.configure('Free.TFrame',background="#6BFFC3")
+        s.configure('Dead.TFrame',background="grey")
+        self.grid_propagate(0)
+        self.configure(height=35, width=35)
+        if "available" in stat or ("ended" in stat and "extended" not in stat):
+            self['style'] = 'Free.TFrame'
+        elif "est. time remaining" in stat or "extended" in stat:
+            self['style'] = 'Running.TFrame'
+            ttk.Label(self,text=stat[19:], font="Calibri 9", \
+            foreground="black").grid(sticky='nsew')
+        elif "out of service" in stat:
+            self['style'] = 'Dead.TFrame'
+
+class Notes(ttk.Frame):
+    def __init__(self, parent):
+        ttk.Frame.__init__(self, parent)
+        self.parent = parent
+        self.configure(height=200,width=150)
+
 class MainApplication(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
         ttk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
         self.parent.title("LaundryView Desktop")
-        self.parent.geometry("1020x500")
+        self.parent.geometry("800x500")
 
+        self.room_url = ""
+        self.stats = {}
         # set the weights for the parent
         self.parent.grid_columnconfigure(0, weight=1)
         self.parent.grid_rowconfigure(0, weight=1)
@@ -130,76 +203,56 @@ class MainApplication(ttk.Frame):
         self.grid_rowconfigure(1, weight=1)
 
         # create the style for the frames
-        self.topFrame = ttk.Frame(self, padding='5 5 5 3')
+        self.topFrame = ttk.Frame(self, padding='5 10 5 3')
         self.topFrame.grid(row=0, column=0, sticky='nsew')
+        self.topFrame.grid_propagate(0)
+        self.topFrame.configure(height = 40)
 
         # set the background of bottom frame
         s = ttk.Style()
         s.configure('My.TFrame',background="#333745")
         self['style'] = 'My.TFrame'
 
-        self.bottomFrame = ttk.Frame(self, relief="sunken", style='My.TFrame')
+        self.bottomFrame = ttk.Frame(self, style='My.TFrame')
         self.bottomFrame.grid(row=1, column=0, sticky='nsew')
+        self.bottomFrame['padding'] = 30
+        self.bottomFrame.grid_rowconfigure(0, weight=1)
+        self.bottomFrame.grid_rowconfigure(1, weight=1)
+        self.bottomFrame.grid_columnconfigure(0, weight=1)
 
-        self.laundry_form = LaundryForm(self) #this is self to access the vars in self
+        self.laundry_form = LaundryForm(self, action_taken=self.paint) #this is self to access the vars in self
         self.laundry_form.grid(row=0, column=0, sticky='nsew')
 
-        self.hostspot_module = None
+        # divide the bottom frame by two divides top and bottom half again
+        self.hostspot_module = HotSpot(self.bottomFrame, self.room_url)
+        self.hostspot_module.grid(row=1,column=0,sticky='sw')
+
+        self.machine_room = MachineRoom(self.bottomFrame, self.stats)
+        self.machine_room.grid(row=0,column=0,sticky='wes')
+        self.bottomFrame.grid_columnconfigure(0, weight=1)
+
         # self.testLabel = ttk.Label(self.bottomFrame, text="Nothing Entered Yet")
         # self.testLabel.pack(expand=True)
+    def paint(self,*args):
+        self.stats = self.laundry_form.stats
+        self.room_url = self.laundry_form.url
+        if self.hostspot_module:
+            self.hostspot_module.destroy()
+            self.machine_room.destroy()
+
+        self.machine_room = MachineRoom(self.bottomFrame, self.stats)
+        self.machine_room.grid(row=0,column=0,sticky='wse')
+
+        self.hostspot_module = HotSpot(self.bottomFrame, self.room_url)
+        self.hostspot_module.grid(row=1,column=0,sticky='sw')
 
 if __name__ == "__main__":
     # start the Took Command Language / Tkinter Interpretor
     root = tk.Tk()
     # prevent the window from being resizable
-    root.resizable(width=False, height=False)
+    # root.resizable(width=False, height=False)
     # draw the MainApplication
+    root.iconbitmap('washing-machine.ico')
     MainApplication(root).grid(row=0, column=0, sticky='nsew')
     # start the main loop
     root.mainloop()
-
-#
-# # create the window
-# window = Tk()
-# window.title("LaundryView-Desktop")
-# #window.geometry("480x240")
-# mainframe = ttk.Frame(window)
-# mainframe.grid(column=0,row=0, sticky=(N,W,E,S))
-
-#
-
-# window.mainloop()
-# # print()
-# # print("Here what's up at the moment")
-# # for key, value in lv.collect_room(my_room).items():
-# #     print(key, value)
-# #
-# # print("\nHere's a heatmap of when the room is the busiest")
-# # for day, hours in lv.collect_heatmap(my_room).items():
-    # time = ["6am","7am","8am","9am","10am","11am","12pm","1pm","2pm","3pm","4pm","5pm",\
-    # "6pm","7pm","8pm","9pm","10pm","11pm","12am","1am","2am","3am","4am","5am"]
-# #
-# #     busy_times = []
-# #     sort_of_busy_times = []
-# #     best_times = []
-# #
-# #     for i in range(len(hours)):
-# #         if hours[i] == 2:
-# #             busy_times.append(time[i])
-# #         elif hours[i] == 1:
-# #             sort_of_busy_times.append(time[i])
-# #         else:
-# #             best_times.append(time[i])
-# #
-# #     print("DAY:", day)
-# #     print("busy_times",busy_times)
-# #     print("sort_of_busy_times",sort_of_busy_times)
-# #     print("best_times", best_times,"\n")
-# #
-# # my_campus = []
-# # try:
-# #     config = open('config').read().split("\n")
-# #     my_campus = config[0]
-# #     #open_room()
-# # except:
-# #     getting_started()
